@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as dotenv from 'dotenv';
+import { ValidationPipe } from '@nestjs/common';
 
 // load environment variables from .env
 dotenv.config();
@@ -14,6 +15,12 @@ async function bootstrap() {
     methods: 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS', // allow HTTP verbs
     credentials: true // allow cookies, auth headers
   });
+
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,            // strip unknown fields
+    forbidNonWhitelisted: true, // error on unknown fields
+    transform: true             // auto-cast primitives
+  }));
 
   const port = Number(process.env.PORT) || 3000
   await app.listen(port);

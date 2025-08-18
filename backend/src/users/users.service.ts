@@ -2,12 +2,14 @@ import { Injectable, NotFoundException, InternalServerErrorException } from '@ne
 import { Observable, from, defer, throwError } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { db } from '../firebase'
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto, PutUserDto } from './dto/update-user.dto';
 import { PublicUser } from './types/user.model';
 
 @Injectable()
 export class UsersService {
     // POST: returns created user
-    create(body: Omit<PublicUser, 'id'>): Observable<PublicUser> {
+    create(body: CreateUserDto): Observable<PublicUser> {
         return defer(async () => {
             const docRef= db.collection('users').doc(); // auto id
             const payload = {
@@ -67,7 +69,7 @@ export class UsersService {
     }
 
     // PATCH: partial update; returns updated user
-    updatePatch(id: string, partial: Partial<Omit<PublicUser, 'id'>>): Observable<PublicUser> {
+    updatePatch(id: string, partial: UpdateUserDto): Observable<PublicUser> {
         return defer(async () => {
             await db.collection('users').doc(id).set(partial as any, { merge: true });
             const snap = await db.collection('users').doc(id).get();
@@ -88,7 +90,7 @@ export class UsersService {
     }
 
     // PUT: full replace; returns updated user
-    updatePut(id: string, full: Omit<PublicUser, 'id'>): Observable<PublicUser> {
+    updatePut(id: string, full: PutUserDto): Observable<PublicUser> {
         return defer(async () => {
             await db.collection('users').doc(id).set(full, { merge: false }); // replace
             return { id, ...full } as PublicUser;

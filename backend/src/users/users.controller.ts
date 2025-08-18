@@ -14,13 +14,15 @@ import {
 import { Observable } from 'rxjs';
 import { UsersService } from './users.service';
 import { PublicUser } from './types/user.model';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto, PutUserDto } from './dto/update-user.dto';
 
 @Controller('users')
 export class UsersController {
   constructor(private readonly users: UsersService) {}
 
   @Post()
-  create(@Body() body: {name: string; email: string, role?: 'user' | 'admin'}): Observable<PublicUser> {
+  create(@Body() body: CreateUserDto): Observable<PublicUser> {
       return this.users.create({
         name: body.name,
         email: body.email,
@@ -41,12 +43,12 @@ export class UsersController {
   }
 
   @Patch(':id')
-  updatePatch(@Param('id') id: string, @Body() body: { name?: string; email?: string; role?: 'user' | 'admin'}): Observable<PublicUser> {
+  updatePatch(@Param('id') id: string, @Body() body: UpdateUserDto): Observable<PublicUser> {
     return this.users.updatePatch(id, body);
   }
 
   @Put(':id')
-  updatePut(@Param('id') id: string, @Body() body: Omit<PublicUser, 'id'>): Observable<PublicUser>{
+  updatePut(@Param('id') id: string, @Body() body: PutUserDto): Observable<PublicUser>{
     return this.users.updatePut(id, body);
   }
 
