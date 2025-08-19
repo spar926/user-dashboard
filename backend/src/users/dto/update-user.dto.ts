@@ -1,25 +1,30 @@
 import { IsEmail, IsIn, IsOptional, IsString, Length } from 'class-validator';
 
-// dto/update-user.dto.ts
+// PATCH: partial update
 export class UpdateUserDto {
-  @IsOptional() @IsString() @Length(1, 80)
+  @IsOptional()
+  @IsString()
+  @Length(1, 80)
   name?: string;
 
-  @IsOptional() @IsEmail()
+  @IsOptional()
+  @IsEmail()
   email?: string;
 
-  @IsOptional() @IsIn(['user', 'admin'])
+  @IsOptional()
+  @IsIn(['user', 'admin'])
   role?: 'user' | 'admin';
 }
 
-// dto/put-user.dto.ts
+// PUT: full replacement
 export class PutUserDto {
-  @IsString() @Length(1, 80)
-  name: string;
+  @IsString()
+  @Length(1, 80)
+  name!: string;
 
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsIn(['user', 'admin'])
-  role: 'user' | 'admin';
+  role!: 'user' | 'admin';
 }

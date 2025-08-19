@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common'
+import { Injectable, NotFoundException, InternalServerErrorException, ConflictException } from '@nestjs/common'
 import { Observable, from, defer, throwError } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { db } from '../firebase'
@@ -11,6 +11,12 @@ export class UsersService {
     // POST: returns created user
     create(body: CreateUserDto): Observable<PublicUser> {
         return defer(async () => {
+            // Check if email already exists
+            const existingUserQuery = await db.collection('users').where('email', '==', body.email).get();
+            if (!existingUserQuery.empty) {
+                throw new ConflictException('A user with this email already exists');
+            }
+
             const docRef= db.collection('users').doc(); // auto id
             const payload = {
                 name: body.name,
@@ -20,9 +26,10 @@ export class UsersService {
             await docRef.set(payload);
             return { id: docRef.id, ...payload } as PublicUser;
         }).pipe(
-            catchError(() =>
-                throwError(() => new InternalServerErrorException('Failed to create user')),
-            ),
+            catchError((err) => {
+                if (err instanceof ConflictException) return throwError(() => err);
+                return throwError(() => new InternalServerErrorException('Failed to create user'));
+            }),
         );
     }
 
@@ -71,9 +78,38 @@ export class UsersService {
     // PATCH: partial update; returns updated user
     updatePatch(id: string, partial: UpdateUserDto): Observable<PublicUser> {
         return defer(async () => {
-            await db.collection('users').doc(id).set(partial as any, { merge: true });
-            const snap = await db.collection('users').doc(id).get();
-            if (!snap.exists) throw new NotFoundException('User not found');
+            const docRef = db.collection('users').doc(id);
+            // Check if user exists first
+            const existingSnap = await docRef.get();
+            if (!existingSnap.exists) {
+                throw new NotFoundException('User not found');
+            }
+
+            // If email is being updated, check for conflicts
+            if (partial.email !== undefined) {
+                const existingUserQuery = await db.collection('users')
+                    .where('email', '==', partial.email)
+                    .get();
+                
+                // Check if another user (not this one) already has this email
+                const conflictingUser = existingUserQuery.docs.find(doc => doc.id !== id);
+                if (conflictingUser) {
+                    throw new ConflictException('A user with this email already exists');
+                }
+            }
+
+            // Filter undefined values before updating
+            const updateData: any = {};
+            if (partial.name !== undefined) updateData.name = partial.name;
+            if (partial.email !== undefined) updateData.email = partial.email;
+            if (partial.role !== undefined) updateData.role = partial.role;
+            
+            // Only update if there's something to update
+            if (Object.keys(updateData).length > 0) {
+                await docRef.update(updateData);
+            }
+            // Get updated data
+            const snap = await docRef.get();
             const data = snap.data() as any;
             return {
                 id: snap.id,
@@ -84,6 +120,7 @@ export class UsersService {
         }).pipe(
             catchError((err) => {
                 if (err instanceof NotFoundException) return throwError(() => err);
+                if (err instanceof ConflictException) return throwError(() => err);
                 return throwError(() => new InternalServerErrorException('Failed to update user'));
             }),
         );
@@ -92,12 +129,39 @@ export class UsersService {
     // PUT: full replace; returns updated user
     updatePut(id: string, full: PutUserDto): Observable<PublicUser> {
         return defer(async () => {
-            await db.collection('users').doc(id).set(full, { merge: false }); // replace
-            return { id, ...full } as PublicUser;
+            const docRef = db.collection('users').doc(id);
+            // Check if user exists first
+            const existingSnap = await docRef.get();
+            if (!existingSnap.exists) {
+                throw new NotFoundException('User not found');
+            }
+
+            // Check for email conflicts
+            const existingUserQuery = await db.collection('users')
+                .where('email', '==', full.email)
+                .get();
+            
+            // Check if another user (not this one) already has this email
+            const conflictingUser = existingUserQuery.docs.find(doc => doc.id !== id);
+            if (conflictingUser) {
+                throw new ConflictException('A user with this email already exists');
+            }
+
+            // Convert to plain object for Firestore
+            const updateData = {
+                name: full.name,
+                email: full.email,
+                role: full.role
+            };
+            // Full replace
+            await docRef.set(updateData);
+            return { id, ...updateData } as PublicUser;
         }).pipe(
-            catchError(() => 
-                throwError(() => new InternalServerErrorException('Failed to replace user')),
-            ),
+            catchError((err) => {
+                if (err instanceof NotFoundException) return throwError(() => err);
+                if (err instanceof ConflictException) return throwError(() => err);
+                return throwError(() => new InternalServerErrorException('Failed to replace user'));
+            }),
         );
     }
 
