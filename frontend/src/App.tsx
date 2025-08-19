@@ -7,7 +7,6 @@ import './App.css';
 
 function App() {
   const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [showForm, setShowForm] = useState(false);
@@ -21,15 +20,12 @@ function App() {
 
   const loadUsers = async () => {
     try {
-      setLoading(true);
       setError('');
       const fetchedUsers = await getUsers();
       setUsers(fetchedUsers);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load users');
-    } finally {
-      setLoading(false);
-    }
+    } 
   };
 
   const handleCreateUser = async (userData: CreateUserRequest) => {
@@ -176,9 +172,6 @@ function App() {
         />
       )}
 
-      {loading ? (
-        <p>Loading users...</p>
-      ) : (
         <>
           <h2>User Count: {users.length}</h2>
           <UserList
@@ -188,7 +181,6 @@ function App() {
             onDelete={handleDeleteUser}
           />
         </>
-      )}
     </div>
   );
 }
