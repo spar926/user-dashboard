@@ -4,10 +4,10 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
-// Mock the firebase import
+// mock the firebase import
 jest.mock('../firebase', () => {
   const mockDoc = {
-    id: 'mock-user-id-123',
+    id: 'mock-user',
     set: jest.fn(),
     get: jest.fn(),
     update: jest.fn(),
@@ -22,7 +22,7 @@ jest.mock('../firebase', () => {
     where: jest.fn(() => mockWhereQuery),
     doc: jest.fn((id?: string) => ({
       ...mockDoc,
-      id: id || 'mock-user-id-123'
+      id: id || 'mock-user'
     })),
     get: jest.fn()
   };
@@ -53,40 +53,34 @@ describe('UsersService', () => {
   });
 
   describe('create', () => {
-    it('should create a user successfully when email is unique', (done) => {
-      // ARRANGE - Set up test data and mocks
+    it('should create a user successfully', (done) => {
       const userData: CreateUserDto = {
-        name: 'John Doe',
-        email: 'john@example.com',
+        name: 'Ally Park',
+        email: 'ally@example.com',
         role: 'user'
       };
       
-      // Get the collection mock
+      // get the collection mock
       const mockCollection = mockDb.collection();
       const mockWhereQuery = mockCollection.where();
       const mockDocRef = mockCollection.doc();
-      
-      // Mock database to return empty result (no existing user)
-      mockWhereQuery.get.mockResolvedValue({ empty: true });
-      mockDocRef.set.mockResolvedValue(undefined);
 
-      // ACT - Call the method we're testing
+      // call the method we're testing
       service.create(userData).subscribe(
         (result) => {
-          // ASSERT - Check if the result is what we expected
           expect(result).toEqual({
-            id: 'mock-user-id-123',
-            name: 'John Doe',
-            email: 'john@example.com',
+            id: 'mock-user',
+            name: 'Ally Park',
+            email: 'ally@example.com',
             role: 'user'
           });
           
-          // Verify database methods were called correctly
+          // verify database methods were called correctly
           expect(mockDb.collection).toHaveBeenCalledWith('users');
-          expect(mockCollection.where).toHaveBeenCalledWith('email', '==', 'john@example.com');
+          expect(mockCollection.where).toHaveBeenCalledWith('email', '==', 'ally@example.com');
           expect(mockDocRef.set).toHaveBeenCalledWith({
-            name: 'John Doe',
-            email: 'john@example.com',
+            name: 'Ally Park',
+            email: 'ally@example.com',
             role: 'user'
           });
           
@@ -95,7 +89,7 @@ describe('UsersService', () => {
         (error) => {
           done(error);
         }
-      );
+      )
     });
   });
 });
