@@ -1,1 +1,5 @@
 node_modules
+.editorconfig
+Local Ollama.yaml
+firebase-debug.log
+firestore-debug.log

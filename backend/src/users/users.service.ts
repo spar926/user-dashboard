@@ -3,6 +3,7 @@ import {
   NotFoundException,
   InternalServerErrorException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Observable, from, defer, throwError } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
@@ -10,10 +11,12 @@ import { db } from '../firebase';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto, PutUserDto } from './dto/update-user.dto';
 import { PublicUser } from './types/user.model';
+import { isUser } from './utils/user.typeguard';
+import { logErrorToFirestore } from './utils/user.errorlog';
+
 // TO-DO: create generic handler that will catch any error caught by controllers (non-200 response)
 // write to firebase the error and the details
-// 2.
-// when ui starts, connect to websocket through API
+// 2. when ui starts, connect to websocket through API
 // whenever user is added to firestore, the api should send message to UI that new user is added and UI should add to screen
 // have api emit an event either over websocket to itself or handled by another service which sends an email
 // UI show email pending to user using timeout (practice real-time communication aspect)
@@ -25,14 +28,15 @@ import { PublicUser } from './types/user.model';
 export class UsersService {
   // POST: returns created user
   create(body: CreateUserDto): Observable<PublicUser> {
+    console.log('=== POST REQUEST RECEIVED ===');
     return defer(async () => {
-      const doc = await db
-        .collection('users')
+      // query the firestore to check if same email exists
+      const doc = await db.collection('users')
         .where('email', '==', body.email)
         .limit(1)
         .get();
 
-      if (!doc.empty) throw new ConflictException('Email Exists');
+      if (!doc.empty) throw new ConflictException('Email already exists'); // 409
 
       const docRef = db.collection('users').doc(); // auto id
       const payload = {
@@ -41,20 +45,19 @@ export class UsersService {
         role: body.role ?? 'user',
       };
       await docRef.set(payload);
-      return { id: docRef.id, ...payload } as PublicUser;
+      return { id: docRef.id, ...payload };
     }).pipe(
       catchError((err) => {
-        if (err instanceof ConflictException) return throwError(() => err);
-        return throwError(
-          () => new InternalServerErrorException('Failed to create user'),
-        );
-      }),
-    );
+        logErrorToFirestore(err);
+        if (err instanceof ConflictException) return throwError(() => err); // 409
+        return throwError(() => new InternalServerErrorException('Failed to create user')); // 500
+      })
+    )
   }
 
   // GET: returns all users
-  // if user is not a user, skip and log error message
   findAll(): Observable<PublicUser[]> {
+    console.log('=== GET REQUEST RECEIVED (ALL) ===');
     return defer(() => db.collection('users').get()).pipe(
       map((snapshot) =>
         snapshot.docs.map((doc) => {
@@ -67,22 +70,29 @@ export class UsersService {
           };
         }),
       ),
-      catchError((err) =>
-        throwError(
-          () => new InternalServerErrorException('Failed to list users'),
-        ),
-      ),
+      catchError((err) => {
+        logErrorToFirestore(err);
+        return throwError(() => new InternalServerErrorException('Failed to get all users')); // 500
+      })
     );
   }
 
   // Get: return specific user; 404 if not found
   findOne(id: string): Observable<PublicUser> {
+    console.log('=== GET REQUEST RECEIVED ===');
+    console.log('ID:', id);
     return defer(() => db.collection('users').doc(id).get()).pipe(
       map((snap) => {
         if (!snap.exists) {
-          throw new NotFoundException('User not found');
+          throw new NotFoundException('User not found!'); // 404
         }
-        const data = snap.data() as any;
+        const data = snap.data() 
+        console.log('Fetched data:', data);
+
+        if (!data || !isUser(data)) {
+          console.log('Invalid user data:', data);
+          throw new BadRequestException('Invalid user data'); // 400
+        }
         return {
           id: snap.id,
           name: data.name,
@@ -90,25 +100,31 @@ export class UsersService {
           role: data.role ?? 'user',
         };
       }),
-      // take out return?
-    //   catchError((err) => {
-    //     if (err instanceof NotFoundException) return throwError(() => err);
-    //     throwError(
-    //       () => new InternalServerErrorException('Failed to get user'),
-    //     );
-    //   }),
+      catchError((err) => {
+        logErrorToFirestore(err);
+        if (err instanceof NotFoundException) return throwError(() => err); // 404
+        if (err instanceof BadRequestException) return throwError(() => err); // 400
+        return throwError(() => new InternalServerErrorException('Failed to get the user')); // 500
+      })
     );
   }
 
   // PATCH: partial update, returns updated user
   updatePatch(id: string, partial: UpdateUserDto): Observable<PublicUser> {
+    console.log('=== PATCH REQUEST RECEIVED ===');
+    console.log('ID: ', id);
     return defer(async () => {
+      if(id === ""){
+        throw new BadRequestException('ID left empty'); // 400
+      }
+      
       const docRef = db.collection('users').doc(id);
       const doc = await docRef.get();
 
       // check if user exists first
       if (!doc.exists) {
-        throw new NotFoundException('User not found');
+        console.log('=== USER NOT FOUND - THROWING EXCEPTION ===');
+        throw new NotFoundException('User not found!'); // 404
       }
 
       // filter undefined values before updating
@@ -120,11 +136,21 @@ export class UsersService {
       // update fails if object is empty
       if (Object.keys(updateData).length > 0) {
         await docRef.update(updateData);
-      }
+      } else {
+        throw new BadRequestException('Update data cannot be empty'); // 400
+      };
 
       // get updated data
       const snap = await docRef.get();
-      const data = snap.data() as any;
+
+      const data = snap.data();
+      console.log('Fetched data', data);
+
+      if (!data || !isUser(data)) {
+        console.log('Invalid user data:', data);
+        throw new BadRequestException('Invalid user data'); // 400
+      }
+
       return {
         id: snap.id,
         name: data.name,
@@ -133,68 +159,63 @@ export class UsersService {
       };
     }).pipe(
       catchError((err) => {
-        if (err instanceof NotFoundException) return throwError(() => err);
-        if (err instanceof ConflictException) return throwError(() => err);
-        return throwError(
-          () => new InternalServerErrorException('Failed to update user'),
-        );
-      }),
-    );
+        logErrorToFirestore(err);
+        if (err instanceof BadRequestException) return throwError(() => err); // 400
+        if (err instanceof NotFoundException) return throwError(() => err); // 404
+        return throwError(() => new InternalServerErrorException('Failed to update user information')); // 500
+      })
+    )
   }
 
   // PUT: full replace; returns updated user
   updatePut(id: string, full: PutUserDto): Observable<PublicUser> {
+    console.log('=== PUT REQUEST RECEIVED ===');
+    console.log('ID: ', id);
     return defer(async () => {
       const docRef = db.collection('users').doc(id);
       const doc = await docRef.get();
 
       if (!doc.exists) {
-        throw new NotFoundException('User not found');
+        throw new NotFoundException('User not found!'); // 404
       }
 
-      // convert to plain object for Firestore
+      // convert to object for Firestore
       const updateData = {
         name: full.name,
         email: full.email,
         role: full.role,
       };
+
       // full replace
       await docRef.set(updateData);
-      return { id, ...updateData } as PublicUser;
+      return { id, ...updateData };
     }).pipe(
       catchError((err) => {
-        if (err instanceof NotFoundException) return throwError(() => err);
-        if (err instanceof ConflictException) return throwError(() => err);
-        return throwError(
-          () => new InternalServerErrorException('Failed to replace user'),
-        );
-      }),
-    );
+        logErrorToFirestore(err);
+        if(err instanceof NotFoundException) return throwError(() => err); // 404
+        return throwError(()=> new InternalServerErrorException('Failed to update user information')); // 500
+      })
+    )
   }
 
   // DELETE
-  remove(id: string, hard = true): Observable<{ success: true }> {
+  remove(id: string): Observable<{ success: true }> {
+    console.log('=== DELETE REQUEST RECEIVED ===');
+    console.log('ID: ', id);
     return defer(async () => {
       const docRef = db.collection('users').doc(id);
       const doc = await docRef.get();
 
-      if (!doc.exists) throw new NotFoundException();
+      if (!doc.exists) throw new NotFoundException('User not found!'); // 404
 
       await docRef.delete();
-      return { success: true as const };
+      return { success: true as const }; // make sure success is always true
     }).pipe(
       catchError((err) => {
-        if (err instanceof NotFoundException) return throwError(() => err);
-        return throwError(
-          () => new InternalServerErrorException('Failed to delete user'),
-        );
-      }),
-    );
+        logErrorToFirestore(err);
+        if (err instanceof NotFoundException) return throwError(() => err); // 404
+        return throwError(() => new InternalServerErrorException('Failed to delete user')); // 500
+      })
+    )
   }
 }
-
-// typeGuard? user firestore converter
-// function isUser(object: unknown): object is PublicUser {
-//     // return a boolean
-//     return
-// }

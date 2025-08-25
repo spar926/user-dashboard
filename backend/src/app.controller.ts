@@ -1,18 +1,24 @@
-import { Controller, Get } from '@nestjs/common';
-import { AppService, DbHealth } from './app.service';
+import { Controller, Get, Post, Body} from '@nestjs/common';
+import { AppService, DbHealthStatus, UserHealthStatus } from './app.service';
+import { firstValueFrom } from 'rxjs';
 
-@Controller()
+@Controller('/health')
 export class AppController {
 
-constructor(private readonly appService: AppService, private readonly dbHealth: DbHealth){}
+constructor(private readonly appService: AppService){}
 
-  @Get('health')
+  @Get()
   getHealth() {
     return this.appService.getHealth();
   }
 
-  @Get('health/db')
-  async getDbHealth() {
-    return this.dbHealth.getDbHealth();
+  @Post() 
+  async getUser(@Body('name') name: string): Promise<UserHealthStatus> {
+    return await firstValueFrom(this.appService.getHealthUser(name));
+  }
+
+  @Get('/db')
+  async getDbHealth(): Promise<DbHealthStatus> {
+    return await firstValueFrom(this.appService.getDbHealth());
   }
 }

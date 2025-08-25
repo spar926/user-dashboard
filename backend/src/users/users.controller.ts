@@ -17,7 +17,7 @@ import { PublicUser } from './types/user.model';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto, PutUserDto } from './dto/update-user.dto';
 
-@Controller('users')
+@Controller('/users')
 export class UsersController {
   constructor(private readonly users: UsersService) {}
 
@@ -53,7 +53,7 @@ export class UsersController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Query('hard', new DefaultValuePipe(true), ParseBoolPipe) hard: boolean): Observable< { success: true } > {
-    return this.users.remove(id, hard);
+  remove(@Param('id') id: string, @Query(new DefaultValuePipe(true), ParseBoolPipe) hard: boolean): Observable< { success: true } > {
+    return this.users.remove(id);
   }
 }

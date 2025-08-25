@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
-import { AppService, DbHealth } from './app.service';
+import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config'
 import { UserModule } from './users/users.module';
 
@@ -10,6 +10,6 @@ import { UserModule } from './users/users.module';
     UserModule,
   ],
   controllers: [AppController],
-  providers: [AppService, DbHealth],
+  providers: [AppService],
 })
 export class AppModule {}

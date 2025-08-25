@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { getUsers, createUser, updateUser, replaceUser, deleteUser } from './lib/api';
 import type { User, CreateUserRequest, UpdateUserRequest, ReplaceUserRequest } from './lib/api';
-import UserList from './components/UserList';
 import UserForm from './components/UserForm';
+import UserList from './components/UserList';
 import './App.css';
 
 function App() {
