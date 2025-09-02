@@ -14,7 +14,13 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@types/socket.io": "^3.0.1",
     "concurrently": "^9.2.0",
     "firebase-tools": "^14.12.1"
+  },
+  "dependencies": {
+    "@nestjs/platform-socket.io": "^11.1.6",
+    "@nestjs/websockets": "^11.1.6",
+    "socket.io": "^4.8.1"
   }
 }

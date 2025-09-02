@@ -3,6 +3,7 @@ import { getUsers, createUser, updateUser, replaceUser, deleteUser } from './lib
 import type { User, CreateUserRequest, UpdateUserRequest, ReplaceUserRequest } from './lib/api';
 import UserForm from './components/UserForm';
 import UserList from './components/UserList';
+import NotificationPopups from './components/NotificationPopups';
 import './App.css';
 
 function App() {
@@ -133,6 +134,9 @@ function App() {
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
       <h1>🌱 User Dashboard 👥</h1>
       
+      {/* Add NotificationPopups component for real-time updates */}
+      <NotificationPopups />
+      
       {error && (
         <div style={{ backgroundColor: '#ffebee', color: '#c62828', padding: '10px', marginBottom: '20px', borderRadius: '4px' }}>
           Error: {error}
@@ -172,15 +176,15 @@ function App() {
         />
       )}
 
-        <>
-          <h2>User Count: {users.length}</h2>
-          <UserList
-            users={users}
-            onEdit={handleEdit}
-            onReplace={handleReplace}
-            onDelete={handleDeleteUser}
-          />
-        </>
+      <>
+        <h2>User Count: {users.length}</h2>
+        <UserList
+          users={users}
+          onEdit={handleEdit}
+          onReplace={handleReplace}
+          onDelete={handleDeleteUser}
+        />
+      </>
     </div>
   );
 }

@@ -3,3 +3,7 @@ node_modules
 Local Ollama.yaml
 firebase-debug.log
 firestore-debug.log
+package.json
+package.json
+package-lock.json
+frontend/package-lock.json

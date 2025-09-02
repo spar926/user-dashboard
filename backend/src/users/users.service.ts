@@ -13,9 +13,10 @@ import { UpdateUserDto, PutUserDto } from './dto/update-user.dto';
 import { PublicUser } from './types/user.model';
 import { isUser } from './utils/user.typeguard';
 import { logErrorToFirestore } from './utils/user.errorlog';
+import { EmailService } from './services/email.service';
+import { EventsGateway } from 'src/websocket/events.gateway';
 
-// TO-DO: create generic handler that will catch any error caught by controllers (non-200 response)
-// write to firebase the error and the details
+// 1. create generic handler that will catch any error caught by controllers
 // 2. when ui starts, connect to websocket through API
 // whenever user is added to firestore, the api should send message to UI that new user is added and UI should add to screen
 // have api emit an event either over websocket to itself or handled by another service which sends an email
@@ -26,6 +27,11 @@ import { logErrorToFirestore } from './utils/user.errorlog';
  */
 @Injectable()
 export class UsersService {
+  constructor(
+    private eventsGateway: EventsGateway,
+    private emailService: EmailService
+  ) {}
+
   // POST: returns created user
   create(body: CreateUserDto): Observable<PublicUser> {
     console.log('=== POST REQUEST RECEIVED ===');
@@ -45,7 +51,15 @@ export class UsersService {
         role: body.role ?? 'user',
       };
       await docRef.set(payload);
-      return { id: docRef.id, ...payload };
+      const newUser = { id: docRef.id, ...payload };
+
+      // emit real-time event for new user when gateway is restored
+      this.eventsGateway.emitUserCreated(newUser);
+      
+      this.emailService.sendWelcomeEmail(newUser.email, newUser.name)
+        .catch(error => console.error('Email service error', error));
+
+      return newUser;
     }).pipe(
       catchError((err) => {
         logErrorToFirestore(err);
